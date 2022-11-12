@@ -104,7 +104,9 @@ def create_dataset(full_meta, full_x, week_ahead=week_ahead):
             y.append(seq[i])
     return np.array(metas, dtype="float32"), seqs, np.array(y, dtype="float32")
 
-
+# meta is region one hot encoding: [no of obs, no of regions]
+# x is snippet of time series: [no of obs, size of full sequence]
+# y is k-week ahead target: [no of obs, target size]
 train_meta, train_x, train_y = create_dataset(full_meta, full_x)
 test_meta, test_x, test_y = create_dataset(full_meta_test, full_x_test)
 
@@ -194,14 +196,14 @@ train_meta_, train_x_, train_y_, train_lens_ = create_tensors(
 
 test_meta, test_x, test_y, test_lens = create_tensors(test_meta, test_x, test_y)
 
-full_x_chunks = np.zeros((full_x.shape[0] * 4, full_x.shape[1], full_x.shape[2]))
-full_meta_chunks = np.zeros((full_meta.shape[0] * 4, full_meta.shape[1]))
-for i, s in enumerate(full_x):
-    full_x_chunks[i * 4, -20:] = s[:20]
-    full_x_chunks[i * 4 + 1, -30:] = s[:30]
-    full_x_chunks[i * 4 + 2, -40:] = s[:40]
-    full_x_chunks[i * 4 + 3, :] = s
-    full_meta_chunks[i * 4 : i * 4 + 4] = full_meta[i]
+# full_x_chunks = np.zeros((full_x.shape[0] * 4, full_x.shape[1], full_x.shape[2]))
+# full_meta_chunks = np.zeros((full_meta.shape[0] * 4, full_meta.shape[1]))
+# for i, s in enumerate(full_x):
+#     full_x_chunks[i * 4, -20:] = s[:20]
+#     full_x_chunks[i * 4 + 1, -30:] = s[:30]
+#     full_x_chunks[i * 4 + 2, -40:] = s[:40]
+#     full_x_chunks[i * 4 + 3, :] = s
+#     full_meta_chunks[i * 4 : i * 4 + 4] = full_meta[i]
 
 full_x = float_tensor(full_x)
 full_meta = float_tensor(full_meta)
@@ -212,24 +214,24 @@ train_mask_, test_mask = (
     create_mask(test_lens),
 )
 
-perm = np.random.permutation(train_meta_.shape[0])
-val_perm = perm[: train_meta_.shape[0] // val_frac]
-train_perm = perm[train_meta_.shape[0] // val_frac :]
+# perm = np.random.permutation(train_meta_.shape[0])
+# val_perm = perm[: train_meta_.shape[0] // val_frac]
+# train_perm = perm[train_meta_.shape[0] // val_frac :]
 
-train_meta, train_x, train_y, train_lens, train_mask = (
-    train_meta_[train_perm],
-    train_x_[train_perm],
-    train_y_[train_perm],
-    train_lens_[train_perm],
-    train_mask_[:, train_perm, :],
-)
-val_meta, val_x, val_y, val_lens, val_mask = (
-    train_meta_[val_perm],
-    train_x_[val_perm],
-    train_y_[val_perm],
-    train_lens_[val_perm],
-    train_mask_[:, val_perm, :],
-)
+# train_meta, train_x, train_y, train_lens, train_mask = (
+#     train_meta_[train_perm],
+#     train_x_[train_perm],
+#     train_y_[train_perm],
+#     train_lens_[train_perm],
+#     train_mask_[:, train_perm, :],
+# )
+# val_meta, val_x, val_y, val_lens, val_mask = (
+#     train_meta_[val_perm],
+#     train_x_[val_perm],
+#     train_y_[val_perm],
+#     train_lens_[val_perm],
+#     train_mask_[:, val_perm, :],
+# )
 
 
 def save_model(file_prefix: str):
@@ -298,6 +300,8 @@ for ep in range(EPOCHS):
     x_embeds = emb_model.forward_mask(train_x.transpose(1, 0), train_meta, train_mask)
     full_embeds = emb_model_full(full_x.transpose(1, 0), full_meta)
     loss, yp, _ = fnp_model.forward(full_embeds, full_y, x_embeds, train_y)
+    # calculate Z values only for a sample of weeks, say 20, 30, 40, 50
+    # input of Z is yp, 
     loss.backward()
     optimizer.step()
     losses.append(loss.detach().cpu().numpy())
